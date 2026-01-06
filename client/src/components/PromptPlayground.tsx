@@ -19,14 +19,10 @@ export function PromptPlayground({ onSend, history, onClearHistory }: PromptPlay
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   
-  // Robust auto-scroll to bottom
+  // Force scroll to bottom when history or loading state changes
   useEffect(() => {
     if (scrollRef.current) {
-      const scrollContainer = scrollRef.current;
-      scrollContainer.scrollTo({
-        top: scrollContainer.scrollHeight,
-        behavior: 'smooth'
-      });
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [history, loading]);
 
@@ -78,20 +74,21 @@ export function PromptPlayground({ onSend, history, onClearHistory }: PromptPlay
           CLEAR_CACHE
         </Button>
       </CardHeader>
-      <CardContent className="flex-1 p-0 flex flex-col min-h-0">
-        {/* Chat History Area - Added min-h-0 and flex-1 to ensure scrolling works */}
+      
+      <CardContent className="flex-1 min-h-0 p-0 flex flex-col relative">
+        {/* Added overflow-y-auto and flex-1 to this container to capture the scroll area correctly */}
         <div 
           ref={scrollRef}
-          className="flex-1 overflow-y-auto p-4 font-mono text-sm border-b border-primary/10 bg-black/20 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent space-y-6 min-h-0"
+          className="flex-1 overflow-y-auto p-4 font-mono text-sm border-b border-primary/10 bg-black/20 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent min-h-0"
         >
           {history.length === 0 && !loading && !error && (
-            <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50 gap-2">
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground opacity-50 gap-2 pointer-events-none">
               <Sparkles className="w-8 h-8" />
               <span className="text-xs uppercase tracking-widest text-center px-4">Neural link inactive. Awaiting signal...</span>
             </div>
           )}
           
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-6 pb-4">
             {history.map((msg) => (
               <div 
                 key={msg.id} 
@@ -117,7 +114,7 @@ export function PromptPlayground({ onSend, history, onClearHistory }: PromptPlay
                     ? "bg-accent/10 border-accent/20 text-foreground" 
                     : "bg-primary/5 border-primary/20 text-foreground/90"
                 )}>
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                  <div className="whitespace-pre-wrap break-words">{msg.content}</div>
                   
                   <Button 
                     variant="ghost" 
@@ -148,14 +145,14 @@ export function PromptPlayground({ onSend, history, onClearHistory }: PromptPlay
                   <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <div className="text-xs">
                       <div className="font-bold uppercase mb-1">NETWORK_FAILURE</div>
-                      <div className="opacity-80 leading-relaxed">{error}</div>
+                      <div className="opacity-80 leading-relaxed break-words">{error}</div>
                   </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Input Area - Flex-shrink-0 to prevent compression */}
+        {/* Input Area */}
         <div className="p-4 bg-primary/5 flex-shrink-0">
             <div className="relative group">
                 <div className="absolute -inset-1 bg-primary/20 rounded-lg blur opacity-0 group-focus-within:opacity-100 transition duration-500" />

@@ -36,7 +36,6 @@ export function KeyManager({
   onAdd, 
   onRemove, 
   onToggle,
-  onUpdateConfig
 }: KeyManagerProps) {
   const [newKey, setNewKey] = useState('');
   const [newLabel, setNewLabel] = useState('');
@@ -55,8 +54,8 @@ export function KeyManager({
   };
 
   return (
-    <Card className="bg-black/40 border-primary/20 backdrop-blur-sm h-full flex flex-col">
-      <CardHeader className="border-b border-primary/10 pb-4 space-y-4">
+    <Card className="bg-black/40 border-primary/20 backdrop-blur-sm h-full flex flex-col overflow-hidden">
+      <CardHeader className="border-b border-primary/10 pb-4 space-y-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <CardTitle className="text-primary flex items-center gap-2 text-lg">
             <ShieldCheck className="w-4 h-4" />
@@ -69,8 +68,11 @@ export function KeyManager({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 p-4 flex flex-col gap-4 overflow-hidden">
-        <div className="grid gap-3 p-4 border border-dashed border-primary/20 rounded-md bg-primary/5">
+      
+      {/* Scrollable Container for the entire content */}
+      <CardContent className="flex-1 p-4 overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent flex flex-col gap-4">
+        {/* Add Key Form */}
+        <div className="grid gap-3 p-4 border border-dashed border-primary/20 rounded-md bg-primary/5 flex-shrink-0">
           <div className="grid grid-cols-1 gap-2">
             <div className="grid grid-cols-2 gap-2">
               <Input placeholder="Node Label" value={newLabel} onChange={e => setNewLabel(e.target.value)} className="bg-background/50 border-primary/20 text-xs h-8" />
@@ -92,7 +94,8 @@ export function KeyManager({
           </Button>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
+        {/* Key List - Using a simple div instead of a nested scroll container for better mobile scrolling flow */}
+        <div className="space-y-3 pb-4">
           <AnimatePresence>
             {keys.map(key => {
               const usagePercent = (key.usageCount / key.limit) * 100;

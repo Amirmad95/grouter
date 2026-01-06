@@ -5,7 +5,7 @@ import { RouterVisualizer } from '@/components/RouterVisualizer';
 import { PromptPlayground } from '@/components/PromptPlayground';
 import { useGeminiKeys, sendGeminiPrompt } from '@/lib/gemini';
 import { useToast } from '@/hooks/use-toast';
-import { Key, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Key, MessageSquare, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function Dashboard() {
@@ -72,7 +72,7 @@ export default function Dashboard() {
   return (
     <Shell>
       <div className="flex flex-col h-[calc(100vh-140px)] relative">
-        {/* Top Visualization */}
+        {/* Top Visualization - Persistent in both tabs but smaller */}
         <div className="flex-shrink-0 mb-4 h-[180px] lg:h-[220px]">
           <RouterVisualizer 
             keys={keys}
@@ -82,7 +82,7 @@ export default function Dashboard() {
         </div>
 
         {/* Tab Content */}
-        <div className="flex-1 overflow-hidden pb-24">
+        <div className="flex-1 overflow-hidden pb-20">
           <div className={cn("h-full", activeTab !== 'chat' && "hidden")}>
             <PromptPlayground 
               onSend={handleSendPrompt} 
@@ -106,27 +106,29 @@ export default function Dashboard() {
         {/* Bottom Navigation */}
         <div className="fixed bottom-0 left-0 right-0 p-4 z-50 pointer-events-none">
           <div className="max-w-md mx-auto pointer-events-auto">
-            <div className="bg-black/80 backdrop-blur-xl border border-primary/20 rounded-2xl flex items-center justify-around p-1 shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+            <div className="bg-black/80 backdrop-blur-xl border border-primary/20 rounded-2xl flex items-center justify-around p-2 shadow-[0_0_20px_rgba(0,0,0,0.5)]">
               <button
                 onClick={() => setActiveTab('chat')}
                 className={cn(
-                  "flex flex-col items-center gap-1 flex-1 py-3 rounded-xl transition-all",
+                  "flex flex-col items-center gap-1 flex-1 py-2 rounded-xl transition-all",
                   activeTab === 'chat' ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 <MessageSquare className="w-5 h-5" />
-                <span className="text-[10px] font-bold uppercase tracking-widest hidden md:inline">Neural_Link</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest">Neural_Link</span>
               </button>
               
+              <div className="w-px h-8 bg-white/10" />
+
               <button
                 onClick={() => setActiveTab('nodes')}
                 className={cn(
-                  "flex flex-col items-center gap-1 flex-1 py-3 rounded-xl transition-all",
+                  "flex flex-col items-center gap-1 flex-1 py-2 rounded-xl transition-all",
                   activeTab === 'nodes' ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 <Key className="w-5 h-5" />
-                <span className="text-[10px] font-bold uppercase tracking-widest hidden md:inline">Node_Vault</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest">Node_Vault</span>
               </button>
             </div>
           </div>

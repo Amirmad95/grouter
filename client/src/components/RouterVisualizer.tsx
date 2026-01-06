@@ -12,28 +12,24 @@ interface RouterVisualizerProps {
 
 export function RouterVisualizer({ keys, activeKeyId, isProcessing }: RouterVisualizerProps) {
   const activeKeys = keys.filter(k => k.isActive);
-  const radius = 100; // Radius of the circle
+  const radius = 60; // Reduced radius for smaller height
 
   return (
-    <div className="relative w-full h-[300px] flex items-center justify-center bg-black/20 rounded-xl border border-white/5 overflow-hidden">
+    <div className="relative w-full h-full flex items-center justify-center bg-black/20 rounded-xl border border-white/5 overflow-hidden">
       {/* Grid Background */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[length:20px_20px]" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[length:15px_15px]" />
 
       {/* Central Router Node */}
-      <div className="relative z-10">
+      <div className="relative z-10 scale-75 md:scale-100">
         <div className={cn(
-          "w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all duration-300 bg-background z-20 relative",
-          isProcessing ? "border-primary shadow-[0_0_30px_hsl(var(--primary))]" : "border-muted-foreground/30"
+          "w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all duration-300 bg-background z-20 relative",
+          isProcessing ? "border-primary shadow-[0_0_20px_hsl(var(--primary))]" : "border-muted-foreground/30"
         )}>
-          <Activity className={cn("w-8 h-8 transition-colors", isProcessing ? "text-primary animate-pulse" : "text-muted-foreground")} />
+          <Activity className={cn("w-6 h-6 transition-colors", isProcessing ? "text-primary animate-pulse" : "text-muted-foreground")} />
         </div>
         
-        {/* Pulse rings */}
         {isProcessing && (
-          <>
-            <div className="absolute inset-0 rounded-full border border-primary/50 animate-ping opacity-20" />
-            <div className="absolute inset-[-10px] rounded-full border border-primary/30 animate-pulse opacity-10" />
-          </>
+          <div className="absolute inset-0 rounded-full border border-primary/50 animate-ping opacity-20" />
         )}
       </div>
 
@@ -52,47 +48,29 @@ export function RouterVisualizer({ keys, activeKeyId, isProcessing }: RouterVisu
             className="absolute z-10"
             style={{ x, y }}
           >
-            {/* Connection Line */}
-            <svg className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[240px] h-[240px] pointer-events-none z-[-1]" style={{ transform: `translate(-50%, -50%) rotate(${angle * 57.29}deg)` }}>
-              {/* This logic is a bit hacky for absolute positioning lines, but simpler for mockup */}
-            </svg>
-            
-            {/* Connection Line (CSS based for simplicity relative to center) */}
-            <div 
-                className={cn(
-                    "absolute top-1/2 left-1/2 w-[100px] h-[2px] origin-left transition-colors duration-300",
-                    isActive ? "bg-primary shadow-[0_0_8px_hsl(var(--primary))]" : "bg-muted-foreground/20"
-                )}
-                style={{
-                    transform: `rotate(${angle + Math.PI}rad) translate(0, -50%)`, // Point towards center
-                    left: 0,
-                    top: 0
-                }}
-            />
-
             {/* Node */}
             <div className={cn(
-              "w-8 h-8 rounded-full border flex items-center justify-center text-[10px] font-bold transition-all duration-300 bg-background",
+              "w-6 h-6 rounded-full border flex items-center justify-center text-[8px] font-bold transition-all duration-300 bg-background",
               isActive 
-                ? "border-primary bg-primary/20 text-primary scale-125 shadow-[0_0_15px_hsl(var(--primary))]" 
+                ? "border-primary bg-primary/20 text-primary scale-125 shadow-[0_0_10px_hsl(var(--primary))]" 
                 : "border-muted-foreground/30 text-muted-foreground"
             )}>
               {index + 1}
             </div>
             
-            {/* Tooltip-ish Label */}
-            <div className={cn(
-                "absolute top-10 left-1/2 -translate-x-1/2 text-[10px] whitespace-nowrap px-2 py-0.5 rounded bg-black/80 border transition-colors",
-                isActive ? "border-primary text-primary" : "border-transparent text-muted-foreground"
-            )}>
-                {key.label}
-            </div>
+            {/* Active Indicator Line */}
+            {isActive && (
+                <div 
+                    className="absolute top-1/2 left-1/2 w-[60px] h-[1px] bg-primary shadow-[0_0_5px_hsl(var(--primary))] origin-left"
+                    style={{ transform: `rotate(${angle + Math.PI}rad) translate(0, -50%)`, left: 0, top: 0 }}
+                />
+            )}
           </motion.div>
         );
       })}
 
       {activeKeys.length === 0 && (
-         <div className="absolute bottom-4 text-xs text-destructive font-mono">
+         <div className="absolute bottom-2 text-[8px] text-destructive font-mono uppercase tracking-widest">
             OFFLINE: NO ACTIVE NODES
          </div>
       )}

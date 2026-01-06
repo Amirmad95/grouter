@@ -46,11 +46,12 @@ export function Shell({ children, settingsContent }: ShellProps) {
               >
                 <Settings className="w-4 h-4" />
               </button>
-              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-primary to-accent border border-white/20 shadow-[0_0_10px_rgba(34,197,94,0.3)]" />
+              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-primary via-primary/80 to-accent border border-white/20 shadow-[0_0_15px_rgba(34,197,94,0.4)] animate-pulse-subtle" />
             </div>
           </header>
 
           <main className="flex-1 overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none opacity-30" />
             {children}
           </main>
         </div>
@@ -65,16 +66,16 @@ export function Shell({ children, settingsContent }: ShellProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsSettingsOpen(false)}
-              className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md"
+              className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl"
             />
             <motion.div 
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 bottom-0 z-[101] w-full max-w-xl bg-[#141414] border-l border-white/10 shadow-2xl flex flex-col"
+              initial={{ x: '100%', opacity: 0.5 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0.5 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed top-2 right-2 bottom-2 z-[101] w-full max-w-lg bg-[#111]/95 backdrop-blur-3xl border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden"
             >
-              <div className="h-12 flex items-center justify-between px-6 border-b border-white/5">
+              <div className="h-14 flex items-center justify-between px-6 border-b border-white/5 bg-white/[0.02]">
                 <div className="flex items-center gap-2">
                   <Settings className="w-3.5 h-3.5 text-primary" />
                   <span className="font-bold uppercase tracking-widest text-[10px]">Cluster_Management</span>

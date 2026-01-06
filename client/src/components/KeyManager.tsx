@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ApiKey } from '@/lib/gemini';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Trash2, Plus, Eye, EyeOff, Power, Key, Zap, ShieldCheck, Cpu, MessageSquareText } from 'lucide-react';
+import { Trash2, Plus, Eye, EyeOff, Power, Key, Zap, ShieldCheck, Cpu, MessageSquareText, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/hooks/use-toast';
 
 interface KeyManagerProps {
   keys: ApiKey[];
@@ -23,7 +24,6 @@ interface KeyManagerProps {
   onUpdateConfig: (id: string, updates: Partial<ApiKey>) => void;
 }
 
-// Updated model list to match standard Gemini names
 const MODELS = [
   { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
   { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
@@ -44,6 +44,7 @@ export function KeyManager({
   const [newModel, setNewModel] = useState('gemini-1.5-flash');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
+  const [isListing, setIsListing] = useState(false);
 
   const handleAdd = () => {
     if (!newKey) return;
@@ -52,6 +53,46 @@ export function KeyManager({
     setNewLabel('');
     setNewLimit('1500');
     setSystemPrompt('');
+  };
+
+  const handleListModels = async () => {
+    if (!newKey && keys.length === 0) {
+      toast({
+        title: "AUTH_REQUIRED",
+        description: "Please enter an API key to list available models.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const keyToUse = newKey || keys.find(k => k.isActive)?.key;
+    if (!keyToUse) return;
+
+    setIsListing(true);
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${keyToUse}`);
+      const data = await response.json();
+      
+      if (data.models) {
+        console.log("Available Models:", data.models);
+        const modelNames = data.models.map((m: any) => m.name.replace('models/', '')).join(', ');
+        toast({
+          title: "MODELS_DISCOVERED",
+          description: `Supported: ${modelNames}`,
+          className: "border-primary text-primary"
+        });
+      } else {
+        throw new Error(data.error?.message || "No models found");
+      }
+    } catch (error: any) {
+      toast({
+        title: "DISCOVERY_FAILED",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsListing(false);
+    }
   };
 
   return (
@@ -77,14 +118,28 @@ export function KeyManager({
               <Input placeholder="Node Label" value={newLabel} onChange={e => setNewLabel(e.target.value)} className="bg-background/50 border-primary/20 text-xs h-8" />
               <Input placeholder="RPM Limit" value={newLimit} type="number" onChange={e => setNewLimit(e.target.value)} className="bg-background/50 border-primary/20 text-xs h-8" />
             </div>
-            <Select value={newModel} onValueChange={setNewModel}>
-              <SelectTrigger className="bg-background/50 border-primary/20 text-xs h-8">
-                <SelectValue placeholder="Select Model" />
-              </SelectTrigger>
-              <SelectContent className="bg-background/95 border-primary/20">
-                {MODELS.map(m => <SelectItem key={m.id} value={m.id} className="text-xs">{m.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            
+            <div className="flex gap-2">
+              <Select value={newModel} onValueChange={setNewModel}>
+                <SelectTrigger className="flex-1 bg-background/50 border-primary/20 text-xs h-8">
+                  <SelectValue placeholder="Select Model" />
+                </SelectTrigger>
+                <SelectContent className="bg-background/95 border-primary/20">
+                  {MODELS.map(m => <SelectItem key={m.id} value={m.id} className="text-xs">{m.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={handleListModels}
+                disabled={isListing}
+                className="h-8 w-8 border-primary/20 text-primary hover:bg-primary/10"
+                title="Discover Available Models"
+              >
+                <List className={cn("w-4 h-4", isListing && "animate-spin")} />
+              </Button>
+            </div>
+
             <Textarea placeholder="System Instruction (Optional)" value={systemPrompt} onChange={e => setSystemPrompt(e.target.value)} className="bg-background/50 border-primary/20 text-[10px] min-h-[40px] max-h-[80px]" />
             <Input placeholder="GEMINI_API_KEY" value={newKey} onChange={e => setNewKey(e.target.value)} type="password" className="bg-background/50 border-primary/20 font-mono text-xs h-8" />
           </div>

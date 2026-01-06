@@ -25,9 +25,18 @@ interface KeyManagerProps {
 }
 
 const MODELS = [
-  { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
-  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
-  { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash (Exp)' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+  { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
+  { id: 'gemini-2.5-flash-native-audio-dialog', name: 'Gemini 2.5 Flash Native Audio' },
+  { id: 'gemini-2.5-flash-tts', name: 'Gemini 2.5 Flash TTS' },
+  { id: 'gemini-3-flash', name: 'Gemini 3 Flash' },
+  { id: 'gemini-embedding-1.0', name: 'Gemini Embedding 1.0' },
+  { id: 'gemini-robotics-er-1.5-preview', name: 'Gemini Robotics 1.5' },
+  { id: 'gemma-3-12b', name: 'Gemma 3 12B' },
+  { id: 'gemma-3-1b', name: 'Gemma 3 1B' },
+  { id: 'gemma-3-27b', name: 'Gemma 3 27B' },
+  { id: 'gemma-3-2b', name: 'Gemma 3 2B' },
+  { id: 'gemma-3-4b', name: 'Gemma 3 4B' },
 ];
 
 export function KeyManager({ 

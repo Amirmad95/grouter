@@ -47,7 +47,7 @@ export function useGeminiKeys() {
         setKeys(parsedKeys.map(k => ({
           ...k,
           isCooldown: k.cooldownUntil ? k.cooldownUntil > now : false,
-          model: k.model || 'gemini-1.5-flash',
+          model: k.model || 'gemini-2.5-flash',
           consecutiveErrors: k.consecutiveErrors || 0
         })));
       } catch (e) {
@@ -102,7 +102,7 @@ export function useGeminiKeys() {
     localStorage.setItem(AUTO_SWITCH_KEY, String(newVal));
   };
 
-  const addKey = (key: string, label: string, limit: number = 1500, model: string = 'gemini-1.5-flash', systemPrompt?: string) => {
+  const addKey = (key: string, label: string, limit: number = 1500, model: string = 'gemini-2.5-flash', systemPrompt?: string) => {
     const newKey: ApiKey = {
       id: Math.random().toString(36).substr(2, 9),
       key,

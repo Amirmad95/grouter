@@ -4,9 +4,10 @@ import { KeyManager } from '@/components/KeyManager';
 import { PromptPlayground } from '@/components/PromptPlayground';
 import { useGeminiKeys, sendGeminiPrompt } from '@/lib/gemini';
 import { useToast } from '@/hooks/use-toast';
-import { Activity, MessageSquare } from 'lucide-react';
+import { Activity, MessageSquare, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import { format, isToday, isYesterday, subDays, startOfDay } from 'date-fns';
 
 // Verified models for the chat selector
 const MODELS = [
@@ -64,26 +65,62 @@ export default function Dashboard() {
 
   const userMessages = chatHistory.filter(m => m.role === 'user');
 
+  // Cluster history by time periods
+  const clusterHistory = () => {
+    const groups: { [key: string]: typeof userMessages } = {
+      'Today': [],
+      'Yesterday': [],
+      'Previous 7 Days': [],
+      'Older': []
+    };
+
+    userMessages.forEach(msg => {
+      const date = new Date(msg.timestamp);
+      if (isToday(date)) groups['Today'].push(msg);
+      else if (isYesterday(date)) groups['Yesterday'].push(msg);
+      else if (date > subDays(startOfDay(new Date()), 7)) groups['Previous 7 Days'].push(msg);
+      else groups['Older'].push(msg);
+    });
+
+    return groups;
+  };
+
+  const clusters = clusterHistory();
+
   const historyContent = (
-    <div className="space-y-1">
+    <div className="space-y-6">
       {userMessages.length === 0 ? (
         <div className="px-4 py-8 text-center border border-dashed border-white/5 rounded-xl">
           <p className="text-[10px] text-muted-foreground uppercase tracking-widest opacity-50 font-bold">No Signal Logs</p>
         </div>
       ) : (
-        userMessages.map((msg) => (
-          <button 
-            key={msg.id}
-            className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-white/[0.04] transition-all group border border-transparent hover:border-white/5"
-          >
-            <div className="flex items-center gap-3">
-              <MessageSquare className="w-3.5 h-3.5 text-primary/40 group-hover:text-primary/70 transition-colors" />
-              <div className="flex-1 truncate">
-                <p className="text-[11px] font-medium text-foreground/80 truncate">{msg.content}</p>
-                <p className="text-[8px] text-muted-foreground uppercase tracking-widest mt-0.5">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+        Object.entries(clusters).map(([label, messages]) => (
+          messages.length > 0 && (
+            <div key={label} className="space-y-2">
+              <div className="flex items-center gap-2 px-2 opacity-40">
+                <Calendar className="w-2.5 h-2.5" />
+                <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>
+              </div>
+              <div className="space-y-1">
+                {messages.map((msg) => (
+                  <button 
+                    key={msg.id}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/[0.04] transition-all group border border-transparent hover:border-white/5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <MessageSquare className="w-3 h-3 text-primary/40 group-hover:text-primary/70 transition-colors shrink-0" />
+                      <div className="flex-1 truncate">
+                        <p className="text-[11px] font-medium text-foreground/80 truncate leading-tight">{msg.content}</p>
+                        <p className="text-[8px] text-muted-foreground uppercase tracking-widest mt-0.5 opacity-50">
+                          {format(new Date(msg.timestamp), 'HH:mm')}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
-          </button>
+          )
         ))
       )}
     </div>

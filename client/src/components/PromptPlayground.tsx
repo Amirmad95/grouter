@@ -2,41 +2,51 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Send, Terminal, Loader2, Sparkles, AlertCircle, Copy, Check } from 'lucide-react';
+import { Send, Terminal, Loader2, Sparkles, AlertCircle, Copy, Check, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ChatMessage } from '@/lib/gemini';
 
 interface PromptPlaygroundProps {
   onSend: (prompt: string) => Promise<string>;
+  history: ChatMessage[];
+  onClearHistory: () => void;
 }
 
-export function PromptPlayground({ onSend }: PromptPlaygroundProps) {
+export function PromptPlayground({ onSend, history, onClearHistory }: PromptPlaygroundProps) {
   const [prompt, setPrompt] = useState('');
-  const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [history, loading]);
+
   const handleSend = async () => {
     if (!prompt.trim()) return;
     
     setLoading(true);
     setError(null);
-    setResponse('');
+    const currentPrompt = prompt;
+    setPrompt('');
     
     try {
-      const result = await onSend(prompt);
-      setResponse(result);
+      await onSend(currentPrompt);
     } catch (err: any) {
       setError(err.message || 'Transmission failed');
+      setPrompt(currentPrompt); // Restore prompt on error
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(response);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -50,57 +60,92 @@ export function PromptPlayground({ onSend }: PromptPlaygroundProps) {
       <CardHeader className="border-b border-primary/10 pb-4 flex flex-row items-center justify-between">
         <CardTitle className="text-primary flex items-center gap-2 text-lg">
           <Terminal className="w-4 h-4" />
-          TEST_CONSOLE
+          NEURAL_LINK
         </CardTitle>
-        {response && (
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={handleCopy}
-            className="h-7 px-2 text-[10px] text-primary hover:bg-primary/10"
-          >
-            {copied ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
-            {copied ? 'COPIED' : 'COPY_RESULT'}
-          </Button>
-        )}
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={onClearHistory}
+          disabled={history.length === 0}
+          className="h-7 px-2 text-[10px] text-destructive hover:bg-destructive/10"
+        >
+          <Trash2 className="w-3 h-3 mr-1" />
+          CLEAR_CACHE
+        </Button>
       </CardHeader>
       <CardContent className="flex-1 p-0 flex flex-col overflow-hidden">
-        {/* Output Area */}
-        <div className="flex-1 overflow-y-auto p-4 font-mono text-sm border-b border-primary/10 bg-black/20 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
-          {!response && !loading && !error && (
+        {/* Chat History Area */}
+        <div 
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto p-4 font-mono text-sm border-b border-primary/10 bg-black/20 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent space-y-6"
+        >
+          {history.length === 0 && !loading && !error && (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50 gap-2">
               <Sparkles className="w-8 h-8" />
-              <span className="text-xs uppercase tracking-widest">Awaiting Input Signal...</span>
+              <span className="text-xs uppercase tracking-widest">Neural link inactive. Awaiting signal...</span>
             </div>
           )}
           
+          {history.map((msg) => (
+            <div 
+              key={msg.id} 
+              className={cn(
+                "group flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300",
+                msg.role === 'user' ? "items-end" : "items-start"
+              )}
+            >
+              <div className="flex items-center gap-2 px-1">
+                <span className={cn(
+                  "text-[10px] uppercase font-bold tracking-tighter opacity-50",
+                  msg.role === 'user' ? "text-accent" : "text-primary"
+                )}>
+                  {msg.role === 'user' ? 'LOCAL_INPUT' : 'REMOTE_NODE'}
+                </span>
+                <span className="text-[8px] opacity-30">
+                  {new Date(msg.timestamp).toLocaleTimeString()}
+                </span>
+              </div>
+              <div className={cn(
+                "relative max-w-[85%] p-3 rounded-md border text-xs leading-relaxed group",
+                msg.role === 'user' 
+                  ? "bg-accent/10 border-accent/20 text-foreground" 
+                  : "bg-primary/5 border-primary/20 text-foreground/90"
+              )}>
+                <div className="whitespace-pre-wrap">{msg.content}</div>
+                
+                {/* Micro-actions */}
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => handleCopy(msg.content, msg.id)}
+                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-background border border-border opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  {copiedId === msg.id ? <Check className="w-3 h-3 text-primary" /> : <Copy className="w-3 h-3" />}
+                </Button>
+              </div>
+            </div>
+          ))}
+
           {loading && (
-            <div className="flex items-center gap-2 text-primary animate-pulse">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-xs uppercase">Processing via neural routing...</span>
+            <div className="flex flex-col gap-2 items-start animate-pulse">
+              <div className="text-[10px] uppercase font-bold tracking-tighter opacity-50 text-primary">
+                REMOTE_NODE
+              </div>
+              <div className="bg-primary/5 border border-primary/20 p-3 rounded-md flex items-center gap-2">
+                <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                <span className="text-[10px] uppercase text-primary">Routing through neural web...</span>
+              </div>
             </div>
           )}
 
           {error && (
-             <div className="text-destructive border border-destructive/20 bg-destructive/10 p-4 rounded flex gap-2 items-start animate-in fade-in slide-in-from-top-1">
+             <div className="text-destructive border border-destructive/20 bg-destructive/10 p-4 rounded flex gap-2 items-start animate-in shake duration-500">
                 <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <div className="text-xs">
-                    <div className="font-bold uppercase mb-1">ERROR: REQUEST_FAILED</div>
+                    <div className="font-bold uppercase mb-1">NETWORK_FAILURE</div>
                     <div className="opacity-80 leading-relaxed">{error}</div>
                 </div>
              </div>
-          )}
-
-          {response && (
-            <div className="animate-in fade-in duration-500">
-                <div className="whitespace-pre-wrap leading-relaxed text-foreground/90">
-                    <span className="text-primary font-bold mr-2 opacity-50">{'>>'}</span>
-                    {response}
-                </div>
-                <div className="mt-4 pt-4 border-t border-white/5 text-[10px] text-muted-foreground uppercase tracking-widest">
-                  End of transmission
-                </div>
-            </div>
           )}
         </div>
 
@@ -113,8 +158,8 @@ export function PromptPlayground({ onSend }: PromptPlaygroundProps) {
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      placeholder="ENTER NEURAL PROMPT (CTRL+ENTER TO SEND)..."
-                      className="min-h-[80px] bg-background/80 border-primary/20 focus-visible:ring-primary pr-12 font-mono text-sm resize-none placeholder:text-primary/20 placeholder:text-[10px] placeholder:uppercase"
+                      placeholder="BROADCAST SIGNAL (CTRL+ENTER)..."
+                      className="min-h-[60px] max-h-[120px] bg-background/80 border-primary/20 focus-visible:ring-primary pr-12 font-mono text-sm resize-none placeholder:text-primary/20 placeholder:text-[10px] placeholder:uppercase"
                   />
                   <Button 
                       size="icon"

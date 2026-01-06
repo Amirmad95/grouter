@@ -10,13 +10,16 @@ export default function Dashboard() {
   const { 
     keys, 
     autoSwitch, 
+    chatHistory,
     toggleAutoSwitch, 
     addKey, 
     removeKey, 
     toggleKey, 
     updateLimit,
     getNextKey, 
-    incrementUsage 
+    incrementUsage,
+    addChatMessage,
+    clearChat
   } = useGeminiKeys();
   const { toast } = useToast();
   
@@ -37,10 +40,12 @@ export default function Dashboard() {
 
     setIsProcessing(true);
     setActiveKeyId(keyToUse.id);
+    addChatMessage('user', prompt);
 
     try {
-        const response = await sendGeminiPrompt(keyToUse.key, prompt);
+        const response = await sendGeminiPrompt(keyToUse.key, prompt, chatHistory);
         incrementUsage(keyToUse.id);
+        addChatMessage('model', response);
         
         return response;
     } catch (error: any) {
@@ -73,7 +78,7 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Right Column: Visualization & Playground */}
+        {/* Right Column: Visualization & Chat */}
         <div className="lg:col-span-2 flex flex-col gap-6 h-full overflow-hidden">
             <div className="flex-shrink-0">
                 <RouterVisualizer 
@@ -82,8 +87,12 @@ export default function Dashboard() {
                     isProcessing={isProcessing}
                 />
             </div>
-            <div className="flex-1 overflow-hidden min-h-[400px]">
-                <PromptPlayground onSend={handleSendPrompt} />
+            <div className="flex-1 overflow-hidden min-h-[450px]">
+                <PromptPlayground 
+                  onSend={handleSendPrompt} 
+                  history={chatHistory}
+                  onClearHistory={clearChat}
+                />
             </div>
         </div>
       </div>

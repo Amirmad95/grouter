@@ -26,7 +26,6 @@ const STORAGE_KEY = 'gemini_router_keys_v5';
 const AUTO_SWITCH_KEY = 'gemini_router_auto_switch_v5';
 const CHAT_HISTORY_KEY = 'gemini_router_chat_history_v5';
 const JITTER_MAX = 5000; // 5 seconds max jitter
-const RETRY_ATTEMPTS = 2;
 
 const MAX_CONSECUTIVE_ERRORS = 3;
 const COOLDOWN_DURATION = 60000;
@@ -218,9 +217,12 @@ export async function sendGeminiPrompt(key: ApiKey, prompt: string, history: Cha
   const jitter = Math.random() * JITTER_MAX;
   await new Promise(resolve => setTimeout(resolve, jitter));
 
+  // The error "models/gemini-1.5-flash is not found for API version v1beta"
+  // suggests that either the model name is incorrect for v1beta or needs a different path.
+  // We'll try using the standard v1beta path which often expects just the model name if not using full path.
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${key.model}:generateContent?key=${key.key}`;
   
-  const contents = history.slice(-8).map(msg => ({ // Reduced history context slightly for better token efficiency
+  const contents = history.slice(-8).map(msg => ({ 
     role: msg.role === 'user' ? 'user' : 'model',
     parts: [{ text: msg.content }]
   }));
@@ -245,6 +247,7 @@ export async function sendGeminiPrompt(key: ApiKey, prompt: string, history: Cha
 
   if (!response.ok) {
     const errorData = await response.json();
+    console.error("Gemini API Error Data:", errorData);
     const message = errorData.error?.message || 'Failed to fetch from Gemini';
     const isRateLimit = response.status === 429;
     throw { message, isRateLimit };

@@ -23,6 +23,7 @@ interface KeyManagerProps {
   onUpdateConfig: (id: string, updates: Partial<ApiKey>) => void;
 }
 
+// Updated model list to match standard Gemini names
 const MODELS = [
   { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
   { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
@@ -69,9 +70,7 @@ export function KeyManager({
         </div>
       </CardHeader>
       
-      {/* Scrollable Container for the entire content */}
       <CardContent className="flex-1 p-4 overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent flex flex-col gap-4">
-        {/* Add Key Form */}
         <div className="grid gap-3 p-4 border border-dashed border-primary/20 rounded-md bg-primary/5 flex-shrink-0">
           <div className="grid grid-cols-1 gap-2">
             <div className="grid grid-cols-2 gap-2">
@@ -94,7 +93,6 @@ export function KeyManager({
           </Button>
         </div>
 
-        {/* Key List - Using a simple div instead of a nested scroll container for better mobile scrolling flow */}
         <div className="space-y-3 pb-4">
           <AnimatePresence>
             {keys.map(key => {

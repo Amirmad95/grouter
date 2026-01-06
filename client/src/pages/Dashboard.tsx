@@ -4,7 +4,7 @@ import { KeyManager } from '@/components/KeyManager';
 import { PromptPlayground } from '@/components/PromptPlayground';
 import { useGeminiKeys, sendGeminiPrompt } from '@/lib/gemini';
 import { useToast } from '@/hooks/use-toast';
-import { Activity } from 'lucide-react';
+import { Activity, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 
@@ -30,10 +30,8 @@ export default function Dashboard() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
 
-  // Handle model change and notify user
   const handleModelChange = (modelId: string) => {
     setSelectedModel(modelId);
-    // Note: In a real app, this might update the preferred model for the cluster
   };
 
   const handleSendPrompt = async (prompt: string, modelOverride?: string): Promise<string> => {
@@ -47,7 +45,6 @@ export default function Dashboard() {
     setActiveKeyId(keyToUse.id);
     addChatMessage('user', prompt);
 
-    // Use selected model from dropdown for this request
     const effectiveKey = { ...keyToUse, model: modelOverride || selectedModel };
 
     try {
@@ -65,26 +62,47 @@ export default function Dashboard() {
     }
   };
 
-  const settingsPanel = (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-lg font-bold tracking-tight uppercase">Node Vault</h2>
-        <p className="text-muted-foreground text-[10px] font-bold uppercase opacity-60">Signal Routing Configuration</p>
-      </div>
-      <KeyManager 
-        keys={keys} 
-        autoSwitch={autoSwitch} 
-        onToggleAutoSwitch={toggleAutoSwitch} 
-        onAdd={addKey} 
-        onRemove={removeKey} 
-        onToggle={toggleKey} 
-        onUpdateConfig={updateKeyConfig} 
-      />
+  const userMessages = chatHistory.filter(m => m.role === 'user');
+
+  const historyContent = (
+    <div className="space-y-1">
+      {userMessages.length === 0 ? (
+        <div className="px-4 py-8 text-center border border-dashed border-white/5 rounded-xl">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest opacity-50 font-bold">No Signal Logs</p>
+        </div>
+      ) : (
+        userMessages.map((msg) => (
+          <button 
+            key={msg.id}
+            className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-white/[0.04] transition-all group border border-transparent hover:border-white/5"
+          >
+            <div className="flex items-center gap-3">
+              <MessageSquare className="w-3.5 h-3.5 text-primary/40 group-hover:text-primary/70 transition-colors" />
+              <div className="flex-1 truncate">
+                <p className="text-[11px] font-medium text-foreground/80 truncate">{msg.content}</p>
+                <p className="text-[8px] text-muted-foreground uppercase tracking-widest mt-0.5">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+              </div>
+            </div>
+          </button>
+        ))
+      )}
     </div>
   );
 
+  const settingsPanel = (
+    <KeyManager 
+      keys={keys} 
+      autoSwitch={autoSwitch} 
+      onToggleAutoSwitch={toggleAutoSwitch} 
+      onAdd={addKey} 
+      onRemove={removeKey} 
+      onToggle={toggleKey} 
+      onUpdateConfig={updateKeyConfig} 
+    />
+  );
+
   return (
-    <Shell settingsContent={settingsPanel}>
+    <Shell settingsContent={settingsPanel} historyContent={historyContent}>
       <div className="h-full flex flex-col relative">
         <div className="flex-1 flex flex-col overflow-hidden h-full">
           <motion.div 

@@ -36,7 +36,12 @@ export function PromptPlayground({ onSend, history, onClearHistory }: PromptPlay
     try {
       await onSend(currentPrompt);
     } catch (err: any) {
-      setError(err.message || 'Transmission failed');
+      console.error("Transmission error detailed:", err);
+      // More descriptive error handling
+      const errorMessage = typeof err === 'object' && err.message 
+        ? `${err.isRateLimit ? '[RATE_LIMIT] ' : ''}${err.message}` 
+        : 'Transmission failed';
+      setError(errorMessage);
       setPrompt(currentPrompt); // Restore prompt on error
     } finally {
       setLoading(false);
@@ -143,7 +148,7 @@ export function PromptPlayground({ onSend, history, onClearHistory }: PromptPlay
                 <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <div className="text-xs">
                     <div className="font-bold uppercase mb-1">NETWORK_FAILURE</div>
-                    <div className="opacity-80 leading-relaxed">{error}</div>
+                    <div className="opacity-80 leading-relaxed break-words">{error}</div>
                 </div>
              </div>
           )}

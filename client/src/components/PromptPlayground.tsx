@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Send, Terminal, Loader2, Sparkles, AlertCircle, Copy, Check, Trash2 } from 'lucide-react';
+import { Send, Loader2, Sparkles, AlertCircle, Copy, Check, Trash2, ArrowDownCircle, Cpu, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChatMessage } from '@/lib/gemini';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface PromptPlaygroundProps {
   onSend: (prompt: string) => Promise<string>;
@@ -18,15 +17,26 @@ export function PromptPlayground({ onSend, history, onClearHistory }: PromptPlay
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
     }
   }, [history, loading]);
 
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+    }
+  }, [prompt]);
+
   const handleSend = async () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || loading) return;
     
     setLoading(true);
     setError(null);
@@ -36,148 +46,174 @@ export function PromptPlayground({ onSend, history, onClearHistory }: PromptPlay
     try {
       await onSend(currentPrompt);
     } catch (err: any) {
-      console.error("Transmission error detailed:", err);
-      // More descriptive error handling
-      const errorMessage = typeof err === 'object' && err.message 
-        ? `${err.isRateLimit ? '[RATE_LIMIT] ' : ''}${err.message}` 
-        : 'Transmission failed';
-      setError(errorMessage);
-      setPrompt(currentPrompt); // Restore prompt on error
+      setError(err.message || 'Transmission failed');
+      setPrompt(currentPrompt);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && e.ctrlKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
       handleSend();
     }
   };
 
   return (
-    <Card className="bg-black/40 border-primary/20 backdrop-blur-sm h-full flex flex-col overflow-hidden">
-      <CardHeader className="border-b border-primary/10 pb-4 flex flex-row items-center justify-between">
-        <CardTitle className="text-primary flex items-center gap-2 text-lg">
-          <Terminal className="w-4 h-4" />
-          NEURAL_LINK
-        </CardTitle>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={onClearHistory}
-          disabled={history.length === 0}
-          className="h-7 px-2 text-[10px] text-destructive hover:bg-destructive/10"
-        >
-          <Trash2 className="w-3 h-3 mr-1" />
-          CLEAR_CACHE
-        </Button>
-      </CardHeader>
-      <CardContent className="flex-1 p-0 flex flex-col overflow-hidden">
-        {/* Chat History Area */}
-        <div 
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto p-4 font-mono text-sm border-b border-primary/10 bg-black/20 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent space-y-6"
-        >
-          {history.length === 0 && !loading && !error && (
-            <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50 gap-2">
-              <Sparkles className="w-8 h-8" />
-              <span className="text-xs uppercase tracking-widest">Neural link inactive. Awaiting signal...</span>
+    <div className="h-full flex flex-col max-w-4xl mx-auto w-full overflow-hidden relative">
+      {/* Chat Area */}
+      <div 
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto px-4 md:px-0 py-8 scrollbar-hide space-y-8"
+      >
+        {history.length === 0 && (
+          <div className="h-full flex flex-col items-center justify-center space-y-6 pt-20">
+            <div className="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_50px_rgba(34,197,94,0.1)]">
+              <Sparkles className="w-8 h-8 text-primary" />
             </div>
-          )}
-          
+            <div className="text-center space-y-2">
+              <h2 className="text-2xl font-bold tracking-tight text-foreground">How can I assist you today?</h2>
+              <p className="text-muted-foreground text-sm max-w-sm">
+                Router v2.5 is active and distributed across your node cluster. Ready for signal broadcast.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 w-full max-w-md pt-8">
+              {['System check', 'List models', 'Router stats', 'Security audit'].map((hint) => (
+                <button 
+                  key={hint}
+                  onClick={() => setPrompt(hint)}
+                  className="p-3 text-left rounded-xl bg-white/5 border border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all text-sm group"
+                >
+                  <div className="text-muted-foreground group-hover:text-primary transition-colors">{hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <AnimatePresence initial={false}>
           {history.map((msg) => (
-            <div 
-              key={msg.id} 
+            <motion.div 
+              key={msg.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
               className={cn(
-                "group flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300",
-                msg.role === 'user' ? "items-end" : "items-start"
+                "group flex gap-4 md:gap-6 w-full max-w-3xl mx-auto",
+                msg.role === 'user' ? "flex-row-reverse" : "flex-row"
               )}
             >
-              <div className="flex items-center gap-2 px-1">
-                <span className={cn(
-                  "text-[10px] uppercase font-bold tracking-tighter opacity-50",
-                  msg.role === 'user' ? "text-accent" : "text-primary"
-                )}>
-                  {msg.role === 'user' ? 'LOCAL_INPUT' : 'REMOTE_NODE'}
-                </span>
-                <span className="text-[8px] opacity-30">
-                  {new Date(msg.timestamp).toLocaleTimeString()}
-                </span>
-              </div>
               <div className={cn(
-                "relative max-w-[85%] p-3 rounded-md border text-xs leading-relaxed group",
+                "w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center border",
                 msg.role === 'user' 
-                  ? "bg-accent/10 border-accent/20 text-foreground" 
-                  : "bg-primary/5 border-primary/20 text-foreground/90"
+                  ? "bg-accent/10 border-accent/20 text-accent" 
+                  : "bg-primary/10 border-primary/20 text-primary"
               )}>
-                <div className="whitespace-pre-wrap">{msg.content}</div>
+                {msg.role === 'user' ? <div className="text-[10px] font-bold">ME</div> : <Cpu className="w-4 h-4" />}
+              </div>
+              
+              <div className={cn(
+                "flex-1 space-y-2",
+                msg.role === 'user' ? "text-right" : "text-left"
+              )}>
+                <div className={cn(
+                  "inline-block rounded-2xl px-4 py-2.5 text-sm md:text-base leading-relaxed shadow-sm transition-all",
+                  msg.role === 'user' 
+                    ? "bg-[#2f2f2f] text-foreground" 
+                    : "bg-transparent text-foreground/90"
+                )}>
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                </div>
                 
-                {/* Micro-actions */}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => handleCopy(msg.content, msg.id)}
-                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-background border border-border opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  {copiedId === msg.id ? <Check className="w-3 h-3 text-primary" /> : <Copy className="w-3 h-3" />}
-                </Button>
+                <div className={cn(
+                  "flex items-center gap-4 text-[10px] uppercase font-bold tracking-widest opacity-0 group-hover:opacity-40 transition-opacity",
+                  msg.role === 'user' ? "justify-end" : "justify-start"
+                )}>
+                  <button onClick={() => navigator.clipboard.writeText(msg.content)} className="hover:text-primary transition-colors flex items-center gap-1">
+                    <Copy className="w-3 h-3" /> COPY
+                  </button>
+                  {msg.role === 'model' && (
+                    <span className="flex items-center gap-1 text-primary">
+                      <Zap className="w-3 h-3" /> ROUTED
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
+            </motion.div>
           ))}
+        </AnimatePresence>
 
-          {loading && (
-            <div className="flex flex-col gap-2 items-start animate-pulse">
-              <div className="text-[10px] uppercase font-bold tracking-tighter opacity-50 text-primary">
-                REMOTE_NODE
-              </div>
-              <div className="bg-primary/5 border border-primary/20 p-3 rounded-md flex items-center gap-2">
-                <Loader2 className="w-3 h-3 animate-spin text-primary" />
-                <span className="text-[10px] uppercase text-primary">Routing through neural web...</span>
+        {loading && (
+          <div className="flex gap-4 md:gap-6 w-full max-w-3xl mx-auto">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+              <Loader2 className="w-4 h-4 animate-spin" />
+            </div>
+            <div className="flex-1 flex items-center h-8">
+              <div className="flex gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" />
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {error && (
-             <div className="text-destructive border border-destructive/20 bg-destructive/10 p-4 rounded flex gap-2 items-start animate-in shake duration-500">
-                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <div className="text-xs">
-                    <div className="font-bold uppercase mb-1">NETWORK_FAILURE</div>
-                    <div className="opacity-80 leading-relaxed break-words">{error}</div>
-                </div>
-             </div>
-          )}
-        </div>
-
-        {/* Input Area */}
-        <div className="p-4 bg-primary/5">
-            <div className="relative group">
-                <div className="absolute -inset-1 bg-primary/20 rounded-lg blur opacity-0 group-focus-within:opacity-100 transition duration-500" />
-                <div className="relative">
-                  <Textarea 
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder="BROADCAST SIGNAL (CTRL+ENTER)..."
-                      className="min-h-[60px] max-h-[120px] bg-background/80 border-primary/20 focus-visible:ring-primary pr-12 font-mono text-sm resize-none placeholder:text-primary/20 placeholder:text-[10px] placeholder:uppercase"
-                  />
-                  <Button 
-                      size="icon"
-                      onClick={handleSend}
-                      disabled={loading || !prompt.trim()}
-                      className="absolute bottom-2 right-2 h-8 w-8 bg-primary/20 text-primary hover:bg-primary hover:text-black border border-primary/50 shadow-[0_0_10px_rgba(34,197,94,0.2)] transition-all"
-                  >
-                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  </Button>
-                </div>
+        {error && (
+          <div className="max-w-3xl mx-auto p-4 rounded-2xl bg-destructive/10 border border-destructive/20 flex gap-3 text-destructive">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <div className="text-sm">
+              <span className="font-bold">TRANSMISSION_ERROR:</span> {error}
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Input Area */}
+      <div className="p-4 md:pb-8 bg-gradient-to-t from-[#0d0d0d] via-[#0d0d0d] to-transparent pt-10">
+        <div className="max-w-3xl mx-auto relative group">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/30 to-accent/30 rounded-3xl blur opacity-0 group-focus-within:opacity-100 transition duration-500" />
+          <div className="relative bg-[#212121] rounded-2xl border border-white/5 shadow-2xl overflow-hidden">
+            <textarea 
+              ref={textareaRef}
+              rows={1}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Message GeminiRouter..."
+              className="w-full bg-transparent px-4 py-4 pr-14 text-sm md:text-base focus:outline-none resize-none min-h-[56px] placeholder:text-muted-foreground/50"
+            />
+            <div className="absolute bottom-2.5 right-2.5 flex items-center gap-2">
+              <Button 
+                size="icon"
+                onClick={handleSend}
+                disabled={loading || !prompt.trim()}
+                className={cn(
+                  "h-9 w-9 rounded-xl transition-all",
+                  prompt.trim() ? "bg-primary text-black hover:bg-primary/90" : "bg-white/5 text-muted-foreground"
+                )}
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </Button>
+            </div>
+          </div>
+          <div className="text-[10px] text-center mt-3 text-muted-foreground/60 uppercase tracking-widest font-medium">
+            Signal encryption active • End-to-end routing
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* Control Overlay */}
+      <div className="absolute top-4 right-4 flex gap-2">
+        <Button 
+          variant="outline" 
+          size="icon" 
+          onClick={onClearHistory}
+          disabled={history.length === 0}
+          className="rounded-full bg-black/40 backdrop-blur-md border-white/10 hover:bg-white/5"
+        >
+          <Trash2 className="w-4 h-4 text-destructive/70" />
+        </Button>
+      </div>
+    </div>
   );
 }

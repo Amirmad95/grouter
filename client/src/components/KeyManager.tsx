@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Trash2, Plus, Eye, EyeOff, Power, Key, Zap } from 'lucide-react';
+import { Trash2, Plus, Eye, EyeOff, Power, Key, Zap, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Progress } from '@/components/ui/progress';
@@ -51,12 +51,12 @@ export function KeyManager({
       <CardHeader className="border-b border-primary/10 pb-4 space-y-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-primary flex items-center gap-2 text-lg">
-            <Key className="w-4 h-4" />
-            KEY_ENGINE
+            <ShieldCheck className="w-4 h-4" />
+            SECURE_ROUTER
           </CardTitle>
           <div className="flex items-center space-x-2 bg-primary/5 px-2 py-1 rounded border border-primary/10">
             <Zap className={cn("w-3 h-3 transition-colors", autoSwitch ? "text-primary" : "text-muted-foreground")} />
-            <Label htmlFor="auto-switch" className="text-[10px] uppercase font-bold tracking-widest cursor-pointer">Auto-Switch</Label>
+            <Label htmlFor="auto-switch" className="text-[10px] uppercase font-bold tracking-widest cursor-pointer">CIRCUIT_BREAKER</Label>
             <Switch 
               id="auto-switch" 
               checked={autoSwitch} 
@@ -78,7 +78,7 @@ export function KeyManager({
                 className="bg-background/50 border-primary/20 focus-visible:ring-primary text-xs h-8"
               />
               <Input 
-                placeholder="Limit (e.g. 1500)" 
+                placeholder="RPM Limit" 
                 value={newLimit}
                 type="number"
                 onChange={e => setNewLimit(e.target.value)}
@@ -86,7 +86,7 @@ export function KeyManager({
               />
             </div>
             <Input 
-              placeholder="API Key (AIza...)" 
+              placeholder="GEMINI_API_KEY" 
               value={newKey}
               onChange={e => setNewKey(e.target.value)}
               type="password"
@@ -99,7 +99,7 @@ export function KeyManager({
             className="w-full bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground border border-primary/50 transition-all uppercase tracking-wider text-xs font-bold h-8"
           >
             <Plus className="w-3 h-3 mr-2" />
-            Initialize Node
+            Sync New Node
           </Button>
         </div>
 
@@ -112,12 +112,13 @@ export function KeyManager({
                 animate={{ opacity: 1 }}
                 className="text-center text-muted-foreground py-8 text-xs italic"
               >
-                SYSTEM EMPTY: AWAITING KEY INJECTION
+                NO ACTIVE NODES IN CLUSTER
               </motion.div>
             )}
             {keys.map(key => {
               const usagePercent = (key.usageCount / key.limit) * 100;
               const isCritical = usagePercent >= 90;
+              const inCooldown = key.isCooldown;
               
               return (
                 <motion.div
@@ -127,34 +128,32 @@ export function KeyManager({
                   exit={{ opacity: 0, scale: 0.9 }}
                   className={cn(
                     "group relative p-3 border rounded-md transition-all duration-300",
-                    key.isActive 
-                      ? "border-primary/30 bg-primary/5" 
-                      : "border-muted bg-muted/20 opacity-60"
+                    inCooldown ? "border-destructive/40 bg-destructive/5" :
+                    key.isActive ? "border-primary/30 bg-primary/5" : "border-muted bg-muted/20 opacity-60"
                   )}
                 >
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center gap-2">
                       <div className={cn(
                         "w-2 h-2 rounded-full", 
+                        inCooldown ? "bg-destructive animate-pulse" :
                         key.isActive ? (isCritical ? "bg-orange-500 animate-pulse" : "bg-primary animate-pulse") : "bg-muted-foreground"
                       )} />
-                      <span className="font-bold text-xs uppercase tracking-tight">{key.label}</span>
+                      <span className="font-bold text-xs uppercase tracking-tight">
+                        {key.label}
+                        {inCooldown && <span className="ml-2 text-destructive text-[8px]">[COOLDOWN]</span>}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Badge variant="outline" className={cn(
-                        "font-mono text-[9px] h-4 px-1",
-                        isCritical ? "border-orange-500/50 text-orange-500" : "border-primary/20 text-primary"
-                      )}>
-                        {key.usageCount}/{key.limit}
-                      </Badge>
-                    </div>
+                    <Badge variant="outline" className={cn(
+                      "font-mono text-[9px] h-4 px-1",
+                      inCooldown ? "border-destructive/50 text-destructive" :
+                      isCritical ? "border-orange-500/50 text-orange-500" : "border-primary/20 text-primary"
+                    )}>
+                      {key.usageCount}/{key.limit}
+                    </Badge>
                   </div>
 
                   <div className="space-y-1.5 mb-3">
-                    <div className="flex justify-between text-[9px] uppercase font-bold opacity-50">
-                      <span>Usage</span>
-                      <span>{Math.round(usagePercent)}%</span>
-                    </div>
                     <Progress 
                       value={usagePercent} 
                       className="h-1 bg-white/5" 
@@ -165,16 +164,14 @@ export function KeyManager({
                     <code className="flex-1 bg-black/50 p-1.5 rounded text-[10px] font-mono text-muted-foreground truncate border border-white/5">
                       {showKey[key.id] ? key.key : '•••• •••• ' + key.key.slice(-4)}
                     </code>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-primary"
-                        onClick={() => toggleShow(key.id)}
-                      >
-                        {showKey[key.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-primary"
+                      onClick={() => toggleShow(key.id)}
+                    >
+                      {showKey[key.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    </Button>
                   </div>
 
                   <div className="flex gap-2">
@@ -184,11 +181,12 @@ export function KeyManager({
                       onClick={() => onToggle(key.id)}
                       className={cn(
                         "flex-1 h-7 text-[10px] font-bold border-primary/20 hover:bg-primary/10 hover:text-primary",
+                        inCooldown ? "text-destructive border-destructive/20 hover:bg-destructive/10" :
                         !key.isActive && "hover:bg-primary/20"
                       )}
                     >
                       <Power className="w-3 h-3 mr-1.5" />
-                      {key.isActive ? 'OFFLINE' : 'ONLINE'}
+                      {inCooldown ? 'RESET_NODE' : key.isActive ? 'OFFLINE' : 'ONLINE'}
                     </Button>
                     <Button 
                       variant="destructive" 

@@ -15,11 +15,18 @@ export interface ApiKey {
   usageCount: number;
   limit: number;
   lastUsed?: number;
+  isCooldown?: boolean;
+  cooldownUntil?: number;
+  consecutiveErrors: number;
 }
 
-const STORAGE_KEY = 'gemini_router_keys_v2';
-const AUTO_SWITCH_KEY = 'gemini_router_auto_switch_v2';
-const CHAT_HISTORY_KEY = 'gemini_router_chat_history_v2';
+const STORAGE_KEY = 'gemini_router_keys_v3';
+const AUTO_SWITCH_KEY = 'gemini_router_auto_switch_v3';
+const CHAT_HISTORY_KEY = 'gemini_router_chat_history_v3';
+
+// Circuit Breaker Config
+const MAX_CONSECUTIVE_ERRORS = 3;
+const COOLDOWN_DURATION = 60000; // 1 minute cooldown
 
 export function useGeminiKeys() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
@@ -33,7 +40,13 @@ export function useGeminiKeys() {
     
     if (storedKeys) {
       try {
-        setKeys(JSON.parse(storedKeys));
+        const parsedKeys: ApiKey[] = JSON.parse(storedKeys);
+        // Clean up cooldowns on load if they've expired
+        const now = Date.now();
+        setKeys(parsedKeys.map(k => ({
+          ...k,
+          isCooldown: k.cooldownUntil ? k.cooldownUntil > now : false
+        })));
       } catch (e) {
         console.error("Failed to parse keys", e);
       }
@@ -50,6 +63,25 @@ export function useGeminiKeys() {
         console.error("Failed to parse chat history", e);
       }
     }
+  }, []);
+
+  // Periodic check to clear cooldowns
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setKeys(prev => {
+        let changed = false;
+        const next = prev.map(k => {
+          if (k.isCooldown && k.cooldownUntil && k.cooldownUntil <= now) {
+            changed = true;
+            return { ...k, isCooldown: false, cooldownUntil: undefined, consecutiveErrors: 0 };
+          }
+          return k;
+        });
+        return changed ? next : prev;
+      });
+    }, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const saveKeys = (newKeys: ApiKey[]) => {
@@ -75,7 +107,8 @@ export function useGeminiKeys() {
       label: label || `Key ${keys.length + 1}`,
       isActive: true,
       usageCount: 0,
-      limit: limit || 1500
+      limit: limit || 1500,
+      consecutiveErrors: 0
     };
     saveKeys([...keys, newKey]);
   };
@@ -85,14 +118,14 @@ export function useGeminiKeys() {
   };
 
   const toggleKey = (id: string) => {
-    saveKeys(keys.map(k => k.id === id ? { ...k, isActive: !k.isActive } : k));
+    saveKeys(keys.map(k => k.id === id ? { ...k, isActive: !k.isActive, consecutiveErrors: 0, isCooldown: false } : k));
   };
 
   const updateLimit = (id: string, limit: number) => {
     saveKeys(keys.map(k => k.id === id ? { ...k, limit } : k));
   };
 
-  const incrementUsage = (id: string) => {
+  const handleRequestSuccess = (id: string) => {
     const newKeys = keys.map(k => {
       if (k.id === id) {
         const newUsage = k.usageCount + 1;
@@ -102,7 +135,34 @@ export function useGeminiKeys() {
           isActive = false;
         }
         
-        return { ...k, usageCount: newUsage, lastUsed: Date.now(), isActive };
+        return { 
+          ...k, 
+          usageCount: newUsage, 
+          lastUsed: Date.now(), 
+          isActive,
+          consecutiveErrors: 0 
+        };
+      }
+      return k;
+    });
+    saveKeys(newKeys);
+  };
+
+  const handleRequestFailure = (id: string, isRateLimit: boolean) => {
+    const newKeys = keys.map(k => {
+      if (k.id === id) {
+        const errors = k.consecutiveErrors + 1;
+        const shouldCooldown = isRateLimit || errors >= MAX_CONSECUTIVE_ERRORS;
+        
+        if (shouldCooldown) {
+          return {
+            ...k,
+            consecutiveErrors: errors,
+            isCooldown: true,
+            cooldownUntil: Date.now() + (isRateLimit ? COOLDOWN_DURATION * 2 : COOLDOWN_DURATION)
+          };
+        }
+        return { ...k, consecutiveErrors: errors };
       }
       return k;
     });
@@ -124,10 +184,17 @@ export function useGeminiKeys() {
   };
 
   const getNextKey = (): ApiKey | null => {
-    const activeKeys = keys.filter(k => k.isActive && k.usageCount < k.limit);
-    if (activeKeys.length === 0) return null;
+    const now = Date.now();
+    const availableKeys = keys.filter(k => 
+      k.isActive && 
+      k.usageCount < k.limit && 
+      (!k.isCooldown || (k.cooldownUntil && k.cooldownUntil <= now))
+    );
     
-    return activeKeys.sort((a, b) => (a.usageCount / a.limit) - (b.usageCount / b.limit))[0];
+    if (availableKeys.length === 0) return null;
+    
+    // Weighted selection: Prefer keys with lowest usage percentage
+    return availableKeys.sort((a, b) => (a.usageCount / a.limit) - (b.usageCount / b.limit))[0];
   };
 
   return { 
@@ -140,7 +207,8 @@ export function useGeminiKeys() {
     toggleKey, 
     updateLimit,
     getNextKey, 
-    incrementUsage,
+    handleRequestSuccess,
+    handleRequestFailure,
     addChatMessage,
     clearChat
   };
@@ -149,13 +217,11 @@ export function useGeminiKeys() {
 export async function sendGeminiPrompt(key: string, prompt: string, history: ChatMessage[] = []) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
   
-  // Format history for Gemini API
-  const contents = history.map(msg => ({
+  const contents = history.slice(-10).map(msg => ({ // Optimization: Only send last 10 messages to avoid token bloating
     role: msg.role === 'user' ? 'user' : 'model',
     parts: [{ text: msg.content }]
   }));
 
-  // Add the current prompt
   contents.push({
     role: 'user',
     parts: [{ text: prompt }]
@@ -170,8 +236,11 @@ export async function sendGeminiPrompt(key: string, prompt: string, history: Cha
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'Failed to fetch from Gemini');
+    const errorData = await response.json();
+    const message = errorData.error?.message || 'Failed to fetch from Gemini';
+    const isRateLimit = response.status === 429;
+    
+    throw { message, isRateLimit };
   }
 
   const data = await response.json();

@@ -17,7 +17,8 @@ export default function Dashboard() {
     toggleKey, 
     updateLimit,
     getNextKey, 
-    incrementUsage,
+    handleRequestSuccess,
+    handleRequestFailure,
     addChatMessage,
     clearChat
   } = useGeminiKeys();
@@ -31,11 +32,11 @@ export default function Dashboard() {
     
     if (!keyToUse) {
         toast({
-            title: "ROUTING FAILURE",
-            description: "NO ACTIVE NODES DETECTED. PLEASE INITIALIZE KEYS.",
+            title: "CLUSTER_FAILURE",
+            description: "ALL NODES ARE OFFLINE OR IN COOLDOWN. WAIT FOR CIRCUIT RESET.",
             variant: "destructive"
         });
-        throw new Error("No active keys available");
+        throw new Error("Cluster offline: all nodes exhausted or in cooldown");
     }
 
     setIsProcessing(true);
@@ -44,18 +45,21 @@ export default function Dashboard() {
 
     try {
         const response = await sendGeminiPrompt(keyToUse.key, prompt, chatHistory);
-        incrementUsage(keyToUse.id);
+        handleRequestSuccess(keyToUse.id);
         addChatMessage('model', response);
         
         return response;
     } catch (error: any) {
         console.error(error);
+        const isRateLimit = error.isRateLimit;
+        handleRequestFailure(keyToUse.id, isRateLimit);
+        
         toast({
-            title: "TRANSMISSION ERROR",
-            description: error.message || "FAILED TO REACH GEMINI NODE.",
+            title: isRateLimit ? "RATE_LIMIT_DETECTED" : "TRANSMISSION_ERROR",
+            description: isRateLimit ? `NODE ${keyToUse.label} ENTERED COOLDOWN.` : "NODE ENCOUNTERED A CRITICAL FAULT.",
             variant: "destructive"
         });
-        throw error;
+        throw new Error(error.message || "Transmission failed");
     } finally {
         setIsProcessing(false);
         setTimeout(() => setActiveKeyId(null), 1500);

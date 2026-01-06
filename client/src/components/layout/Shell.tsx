@@ -24,29 +24,29 @@ export function Shell({ children, settingsContent }: ShellProps) {
       <div className="relative z-10 flex h-screen overflow-hidden">
         {/* Content Area */}
         <div className="flex-1 flex flex-col relative overflow-hidden bg-gradient-to-b from-black/0 to-black/20">
-          <header className="h-16 flex items-center justify-between px-6 border-b border-white/5 bg-black/40 backdrop-blur-xl">
+          <header className="h-12 flex items-center justify-between px-4 border-b border-white/5 bg-black/40 backdrop-blur-xl shrink-0">
             <div className="flex items-center gap-2">
-              <Terminal className="w-5 h-5 text-primary" />
-              <span className="font-bold tracking-tight text-lg">Gemini<span className="text-primary">Router</span></span>
+              <Terminal className="w-4 h-4 text-primary" />
+              <span className="font-bold tracking-tight text-base">Gemini<span className="text-primary">Router</span></span>
             </div>
             
-            <div className="hidden md:flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="hidden md:flex items-center gap-3 text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
               <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <div className="w-1 h-1 rounded-full bg-primary" />
                 <span>Cluster Active</span>
               </div>
-              <ChevronRight className="w-4 h-4 opacity-20" />
-              <span className="text-foreground/60">v2.5.0-flash</span>
+              <ChevronRight className="w-3 h-3 opacity-20" />
+              <span className="text-foreground/40 font-mono">v2.5.0-flash</span>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button 
                 onClick={() => setIsSettingsOpen(true)}
-                className="p-2 rounded-lg hover:bg-white/5 text-muted-foreground transition-all"
+                className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground transition-all"
               >
-                <Settings className="w-5 h-5" />
+                <Settings className="w-4 h-4" />
               </button>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-accent border border-white/20 shadow-[0_0_15px_rgba(34,197,94,0.3)]" />
+              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-primary to-accent border border-white/20 shadow-[0_0_10px_rgba(34,197,94,0.3)]" />
             </div>
           </header>
 
@@ -74,16 +74,16 @@ export function Shell({ children, settingsContent }: ShellProps) {
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="fixed top-0 right-0 bottom-0 z-[101] w-full max-w-xl bg-[#141414] border-l border-white/10 shadow-2xl flex flex-col"
             >
-              <div className="h-16 flex items-center justify-between px-6 border-b border-white/5">
+              <div className="h-12 flex items-center justify-between px-6 border-b border-white/5">
                 <div className="flex items-center gap-2">
-                  <Settings className="w-4 h-4 text-primary" />
-                  <span className="font-bold uppercase tracking-widest text-sm">Cluster_Management</span>
+                  <Settings className="w-3.5 h-3.5 text-primary" />
+                  <span className="font-bold uppercase tracking-widest text-[10px]">Cluster_Management</span>
                 </div>
                 <button 
                   onClick={() => setIsSettingsOpen(false)}
-                  className="p-2 rounded-lg hover:bg-white/5 text-muted-foreground transition-all"
+                  className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground transition-all"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">

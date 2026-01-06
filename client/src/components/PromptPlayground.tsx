@@ -1,17 +1,33 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Send, Loader2, Sparkles, AlertCircle, Copy, Check, Trash2, ArrowDownCircle, Cpu, Zap } from 'lucide-react';
+import { Send, Loader2, Sparkles, AlertCircle, Copy, Check, Trash2, Cpu, Zap, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChatMessage } from '@/lib/gemini';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface PromptPlaygroundProps {
-  onSend: (prompt: string) => Promise<string>;
+  onSend: (prompt: string, modelOverride?: string) => Promise<string>;
   history: ChatMessage[];
   onClearHistory: () => void;
+  currentModel: string;
+  onModelChange: (model: string) => void;
+  availableModels: { id: string, name: string }[];
 }
 
-export function PromptPlayground({ onSend, history, onClearHistory }: PromptPlaygroundProps) {
+export function PromptPlayground({ 
+  onSend, 
+  history, 
+  onClearHistory, 
+  currentModel, 
+  onModelChange,
+  availableModels 
+}: PromptPlaygroundProps) {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +60,7 @@ export function PromptPlayground({ onSend, history, onClearHistory }: PromptPlay
     setPrompt('');
     
     try {
-      await onSend(currentPrompt);
+      await onSend(currentPrompt, currentModel);
     } catch (err: any) {
       setError(err.message || 'Transmission failed');
       setPrompt(currentPrompt);
@@ -60,34 +76,52 @@ export function PromptPlayground({ onSend, history, onClearHistory }: PromptPlay
     }
   };
 
+  const activeModelName = availableModels.find(m => m.id === currentModel)?.name || currentModel;
+
   return (
     <div className="h-full flex flex-col max-w-4xl mx-auto w-full overflow-hidden relative">
+      {/* Model Selector Header */}
+      <div className="flex justify-center pt-2 pb-1 shrink-0">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 gap-2 rounded-full px-4 hover:bg-white/5 text-muted-foreground hover:text-foreground border border-transparent hover:border-white/10 transition-all">
+              <span className="text-xs font-semibold tracking-tight">{activeModelName}</span>
+              <ChevronDown className="w-3.5 h-3.5 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" className="w-56 bg-[#1a1a1a] border-white/10 text-foreground">
+            {availableModels.map((model) => (
+              <DropdownMenuItem 
+                key={model.id}
+                onClick={() => onModelChange(model.id)}
+                className={cn(
+                  "flex flex-col items-start gap-0.5 py-2 cursor-pointer focus:bg-primary/10 focus:text-primary",
+                  currentModel === model.id && "bg-primary/5 text-primary"
+                )}
+              >
+                <div className="font-medium text-sm">{model.name}</div>
+                <div className="text-[10px] opacity-50 font-mono uppercase">{model.id}</div>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       {/* Chat Area */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 md:px-0 py-8 scrollbar-hide space-y-8"
+        className="flex-1 overflow-y-auto px-4 md:px-0 py-4 scrollbar-hide space-y-6"
       >
         {history.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center space-y-6 pt-20">
-            <div className="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_50px_rgba(34,197,94,0.1)]">
-              <Sparkles className="w-8 h-8 text-primary" />
+          <div className="h-full flex flex-col items-center justify-center space-y-4 pt-10">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_40px_rgba(34,197,94,0.1)]">
+              <Sparkles className="w-6 h-6 text-primary" />
             </div>
-            <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold tracking-tight text-foreground">How can I assist you today?</h2>
-              <p className="text-muted-foreground text-sm max-w-sm">
-                Router v2.5 is active and distributed across your node cluster. Ready for signal broadcast.
+            <div className="text-center space-y-1">
+              <h2 className="text-xl font-bold tracking-tight text-foreground">Awaiting Input</h2>
+              <p className="text-muted-foreground text-xs max-w-[280px]">
+                Active Node: <span className="text-primary font-mono">{currentModel}</span>
               </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3 w-full max-w-md pt-8">
-              {['System check', 'List models', 'Router stats', 'Security audit'].map((hint) => (
-                <button 
-                  key={hint}
-                  onClick={() => setPrompt(hint)}
-                  className="p-3 text-left rounded-xl bg-white/5 border border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all text-sm group"
-                >
-                  <div className="text-muted-foreground group-hover:text-primary transition-colors">{hint}</div>
-                </button>
-              ))}
             </div>
           </div>
         )}
@@ -99,25 +133,25 @@ export function PromptPlayground({ onSend, history, onClearHistory }: PromptPlay
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className={cn(
-                "group flex gap-4 md:gap-6 w-full max-w-3xl mx-auto",
+                "group flex gap-3 md:gap-4 w-full max-w-3xl mx-auto",
                 msg.role === 'user' ? "flex-row-reverse" : "flex-row"
               )}
             >
               <div className={cn(
-                "w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center border",
+                "w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center border",
                 msg.role === 'user' 
                   ? "bg-accent/10 border-accent/20 text-accent" 
                   : "bg-primary/10 border-primary/20 text-primary"
               )}>
-                {msg.role === 'user' ? <div className="text-[10px] font-bold">ME</div> : <Cpu className="w-4 h-4" />}
+                {msg.role === 'user' ? <div className="text-[9px] font-bold">ME</div> : <Cpu className="w-3.5 h-3.5" />}
               </div>
               
               <div className={cn(
-                "flex-1 space-y-2",
+                "flex-1 space-y-1.5",
                 msg.role === 'user' ? "text-right" : "text-left"
               )}>
                 <div className={cn(
-                  "inline-block rounded-2xl px-4 py-2.5 text-sm md:text-base leading-relaxed shadow-sm transition-all",
+                  "inline-block rounded-2xl px-4 py-2 text-sm md:text-base leading-relaxed shadow-sm transition-all",
                   msg.role === 'user' 
                     ? "bg-[#2f2f2f] text-foreground" 
                     : "bg-transparent text-foreground/90"
@@ -126,7 +160,7 @@ export function PromptPlayground({ onSend, history, onClearHistory }: PromptPlay
                 </div>
                 
                 <div className={cn(
-                  "flex items-center gap-4 text-[10px] uppercase font-bold tracking-widest opacity-0 group-hover:opacity-40 transition-opacity",
+                  "flex items-center gap-3 text-[9px] uppercase font-bold tracking-widest opacity-0 group-hover:opacity-40 transition-opacity",
                   msg.role === 'user' ? "justify-end" : "justify-start"
                 )}>
                   <button onClick={() => navigator.clipboard.writeText(msg.content)} className="hover:text-primary transition-colors flex items-center gap-1">
@@ -144,74 +178,74 @@ export function PromptPlayground({ onSend, history, onClearHistory }: PromptPlay
         </AnimatePresence>
 
         {loading && (
-          <div className="flex gap-4 md:gap-6 w-full max-w-3xl mx-auto">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-              <Loader2 className="w-4 h-4 animate-spin" />
+          <div className="flex gap-3 md:gap-4 w-full max-w-3xl mx-auto">
+            <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
             </div>
-            <div className="flex-1 flex items-center h-8">
+            <div className="flex-1 flex items-center h-7">
               <div className="flex gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
-                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
-                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" />
+                <div className="w-1 h-1 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+                <div className="w-1 h-1 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+                <div className="w-1 h-1 rounded-full bg-primary animate-bounce" />
               </div>
             </div>
           </div>
         )}
 
         {error && (
-          <div className="max-w-3xl mx-auto p-4 rounded-2xl bg-destructive/10 border border-destructive/20 flex gap-3 text-destructive">
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            <div className="text-sm">
-              <span className="font-bold">TRANSMISSION_ERROR:</span> {error}
+          <div className="max-w-3xl mx-auto p-3 rounded-2xl bg-destructive/10 border border-destructive/20 flex gap-3 text-destructive">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <div className="text-xs">
+              <span className="font-bold">SIGNAL_LOST:</span> {error}
             </div>
           </div>
         )}
       </div>
 
       {/* Input Area */}
-      <div className="p-4 md:pb-8 bg-gradient-to-t from-[#0d0d0d] via-[#0d0d0d] to-transparent pt-10">
+      <div className="p-3 md:pb-6 bg-gradient-to-t from-[#0d0d0d] via-[#0d0d0d] to-transparent pt-6 shrink-0">
         <div className="max-w-3xl mx-auto relative group">
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/30 to-accent/30 rounded-3xl blur opacity-0 group-focus-within:opacity-100 transition duration-500" />
-          <div className="relative bg-[#212121] rounded-2xl border border-white/5 shadow-2xl overflow-hidden">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/30 to-accent/30 rounded-2xl blur opacity-0 group-focus-within:opacity-100 transition duration-500" />
+          <div className="relative bg-[#212121] rounded-xl border border-white/5 shadow-2xl overflow-hidden">
             <textarea 
               ref={textareaRef}
               rows={1}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Message GeminiRouter..."
-              className="w-full bg-transparent px-4 py-4 pr-14 text-sm md:text-base focus:outline-none resize-none min-h-[56px] placeholder:text-muted-foreground/50"
+              placeholder={`Message ${activeModelName}...`}
+              className="w-full bg-transparent px-4 py-3.5 pr-12 text-sm md:text-base focus:outline-none resize-none min-h-[52px] max-h-[180px] placeholder:text-muted-foreground/40"
             />
-            <div className="absolute bottom-2.5 right-2.5 flex items-center gap-2">
+            <div className="absolute bottom-2 right-2 flex items-center gap-2">
               <Button 
                 size="icon"
                 onClick={handleSend}
                 disabled={loading || !prompt.trim()}
                 className={cn(
-                  "h-9 w-9 rounded-xl transition-all",
+                  "h-8 w-8 rounded-lg transition-all",
                   prompt.trim() ? "bg-primary text-black hover:bg-primary/90" : "bg-white/5 text-muted-foreground"
                 )}
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               </Button>
             </div>
           </div>
-          <div className="text-[10px] text-center mt-3 text-muted-foreground/60 uppercase tracking-widest font-medium">
-            Signal encryption active • End-to-end routing
+          <div className="text-[9px] text-center mt-2 text-muted-foreground/40 uppercase tracking-[0.2em] font-bold">
+            Secure Neural Link v2.5.0
           </div>
         </div>
       </div>
 
       {/* Control Overlay */}
-      <div className="absolute top-4 right-4 flex gap-2">
+      <div className="absolute top-2 right-2 flex gap-1.5">
         <Button 
           variant="outline" 
           size="icon" 
           onClick={onClearHistory}
           disabled={history.length === 0}
-          className="rounded-full bg-black/40 backdrop-blur-md border-white/10 hover:bg-white/5"
+          className="h-8 w-8 rounded-full bg-black/40 backdrop-blur-md border-white/10 hover:bg-white/5"
         >
-          <Trash2 className="w-4 h-4 text-destructive/70" />
+          <Trash2 className="w-3.5 h-3.5 text-destructive/60" />
         </Button>
       </div>
     </div>

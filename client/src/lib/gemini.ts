@@ -22,9 +22,11 @@ export interface ApiKey {
   systemPrompt?: string;
 }
 
-const STORAGE_KEY = 'gemini_router_keys_v4';
-const AUTO_SWITCH_KEY = 'gemini_router_auto_switch_v4';
-const CHAT_HISTORY_KEY = 'gemini_router_chat_history_v4';
+const STORAGE_KEY = 'gemini_router_keys_v5';
+const AUTO_SWITCH_KEY = 'gemini_router_auto_switch_v5';
+const CHAT_HISTORY_KEY = 'gemini_router_chat_history_v5';
+const JITTER_MAX = 5000; // 5 seconds max jitter
+const RETRY_ATTEMPTS = 2;
 
 const MAX_CONSECUTIVE_ERRORS = 3;
 const COOLDOWN_DURATION = 60000;
@@ -153,7 +155,7 @@ export function useGeminiKeys() {
             ...k,
             consecutiveErrors: errors,
             isCooldown: true,
-            cooldownUntil: Date.now() + (isRateLimit ? COOLDOWN_DURATION * 2 : COOLDOWN_DURATION)
+            cooldownUntil: Date.now() + (isRateLimit ? COOLDOWN_DURATION * 5 : COOLDOWN_DURATION) // Exponential backoff for rate limits
           };
         }
         return { ...k, consecutiveErrors: errors };
@@ -185,7 +187,13 @@ export function useGeminiKeys() {
       (!k.isCooldown || (k.cooldownUntil && k.cooldownUntil <= now))
     );
     if (availableKeys.length === 0) return null;
-    return availableKeys.sort((a, b) => (a.usageCount / a.limit) - (b.usageCount / b.limit))[0];
+    
+    // Sort by usage percentage + add small randomization for load balancing
+    return availableKeys.sort((a, b) => {
+      const usageA = (a.usageCount / a.limit) + (Math.random() * 0.05);
+      const usageB = (b.usageCount / b.limit) + (Math.random() * 0.05);
+      return usageA - usageB;
+    })[0];
   };
 
   return { 
@@ -206,9 +214,13 @@ export function useGeminiKeys() {
 }
 
 export async function sendGeminiPrompt(key: ApiKey, prompt: string, history: ChatMessage[] = []) {
+  // Anti-fingerprinting: Add random jitter to request timing
+  const jitter = Math.random() * JITTER_MAX;
+  await new Promise(resolve => setTimeout(resolve, jitter));
+
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${key.model}:generateContent?key=${key.key}`;
   
-  const contents = history.slice(-10).map(msg => ({
+  const contents = history.slice(-8).map(msg => ({ // Reduced history context slightly for better token efficiency
     role: msg.role === 'user' ? 'user' : 'model',
     parts: [{ text: msg.content }]
   }));

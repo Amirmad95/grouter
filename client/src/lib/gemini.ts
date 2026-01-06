@@ -18,15 +18,16 @@ export interface ApiKey {
   isCooldown?: boolean;
   cooldownUntil?: number;
   consecutiveErrors: number;
+  model: string;
+  systemPrompt?: string;
 }
 
-const STORAGE_KEY = 'gemini_router_keys_v3';
-const AUTO_SWITCH_KEY = 'gemini_router_auto_switch_v3';
-const CHAT_HISTORY_KEY = 'gemini_router_chat_history_v3';
+const STORAGE_KEY = 'gemini_router_keys_v4';
+const AUTO_SWITCH_KEY = 'gemini_router_auto_switch_v4';
+const CHAT_HISTORY_KEY = 'gemini_router_chat_history_v4';
 
-// Circuit Breaker Config
 const MAX_CONSECUTIVE_ERRORS = 3;
-const COOLDOWN_DURATION = 60000; // 1 minute cooldown
+const COOLDOWN_DURATION = 60000;
 
 export function useGeminiKeys() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
@@ -41,11 +42,12 @@ export function useGeminiKeys() {
     if (storedKeys) {
       try {
         const parsedKeys: ApiKey[] = JSON.parse(storedKeys);
-        // Clean up cooldowns on load if they've expired
         const now = Date.now();
         setKeys(parsedKeys.map(k => ({
           ...k,
-          isCooldown: k.cooldownUntil ? k.cooldownUntil > now : false
+          isCooldown: k.cooldownUntil ? k.cooldownUntil > now : false,
+          model: k.model || 'gemini-1.5-flash',
+          consecutiveErrors: k.consecutiveErrors || 0
         })));
       } catch (e) {
         console.error("Failed to parse keys", e);
@@ -65,7 +67,6 @@ export function useGeminiKeys() {
     }
   }, []);
 
-  // Periodic check to clear cooldowns
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
@@ -100,7 +101,7 @@ export function useGeminiKeys() {
     localStorage.setItem(AUTO_SWITCH_KEY, String(newVal));
   };
 
-  const addKey = (key: string, label: string, limit: number = 1500) => {
+  const addKey = (key: string, label: string, limit: number = 1500, model: string = 'gemini-1.5-flash', systemPrompt?: string) => {
     const newKey: ApiKey = {
       id: Math.random().toString(36).substr(2, 9),
       key,
@@ -108,7 +109,9 @@ export function useGeminiKeys() {
       isActive: true,
       usageCount: 0,
       limit: limit || 1500,
-      consecutiveErrors: 0
+      consecutiveErrors: 0,
+      model,
+      systemPrompt
     };
     saveKeys([...keys, newKey]);
   };
@@ -121,8 +124,8 @@ export function useGeminiKeys() {
     saveKeys(keys.map(k => k.id === id ? { ...k, isActive: !k.isActive, consecutiveErrors: 0, isCooldown: false } : k));
   };
 
-  const updateLimit = (id: string, limit: number) => {
-    saveKeys(keys.map(k => k.id === id ? { ...k, limit } : k));
+  const updateKeyConfig = (id: string, updates: Partial<ApiKey>) => {
+    saveKeys(keys.map(k => k.id === id ? { ...k, ...updates } : k));
   };
 
   const handleRequestSuccess = (id: string) => {
@@ -130,18 +133,10 @@ export function useGeminiKeys() {
       if (k.id === id) {
         const newUsage = k.usageCount + 1;
         let isActive = k.isActive;
-        
         if (autoSwitch && newUsage >= k.limit * 0.9) {
           isActive = false;
         }
-        
-        return { 
-          ...k, 
-          usageCount: newUsage, 
-          lastUsed: Date.now(), 
-          isActive,
-          consecutiveErrors: 0 
-        };
+        return { ...k, usageCount: newUsage, lastUsed: Date.now(), isActive, consecutiveErrors: 0 };
       }
       return k;
     });
@@ -153,7 +148,6 @@ export function useGeminiKeys() {
       if (k.id === id) {
         const errors = k.consecutiveErrors + 1;
         const shouldCooldown = isRateLimit || errors >= MAX_CONSECUTIVE_ERRORS;
-        
         if (shouldCooldown) {
           return {
             ...k,
@@ -190,10 +184,7 @@ export function useGeminiKeys() {
       k.usageCount < k.limit && 
       (!k.isCooldown || (k.cooldownUntil && k.cooldownUntil <= now))
     );
-    
     if (availableKeys.length === 0) return null;
-    
-    // Weighted selection: Prefer keys with lowest usage percentage
     return availableKeys.sort((a, b) => (a.usageCount / a.limit) - (b.usageCount / b.limit))[0];
   };
 
@@ -205,7 +196,7 @@ export function useGeminiKeys() {
     addKey, 
     removeKey, 
     toggleKey, 
-    updateLimit,
+    updateKeyConfig,
     getNextKey, 
     handleRequestSuccess,
     handleRequestFailure,
@@ -214,13 +205,20 @@ export function useGeminiKeys() {
   };
 }
 
-export async function sendGeminiPrompt(key: string, prompt: string, history: ChatMessage[] = []) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+export async function sendGeminiPrompt(key: ApiKey, prompt: string, history: ChatMessage[] = []) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${key.model}:generateContent?key=${key.key}`;
   
-  const contents = history.slice(-10).map(msg => ({ // Optimization: Only send last 10 messages to avoid token bloating
+  const contents = history.slice(-10).map(msg => ({
     role: msg.role === 'user' ? 'user' : 'model',
     parts: [{ text: msg.content }]
   }));
+
+  if (key.systemPrompt) {
+    contents.unshift({
+      role: 'user',
+      parts: [{ text: `System Instruction: ${key.systemPrompt}` }]
+    });
+  }
 
   contents.push({
     role: 'user',
@@ -229,9 +227,7 @@ export async function sendGeminiPrompt(key: string, prompt: string, history: Cha
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contents })
   });
 
@@ -239,7 +235,6 @@ export async function sendGeminiPrompt(key: string, prompt: string, history: Cha
     const errorData = await response.json();
     const message = errorData.error?.message || 'Failed to fetch from Gemini';
     const isRateLimit = response.status === 429;
-    
     throw { message, isRateLimit };
   }
 
